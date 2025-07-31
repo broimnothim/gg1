@@ -1,0 +1,213 @@
+-- Safely determine the global environment
+local env
+if type(getgenv) == "function" then
+    env = getgenv()
+elseif type(getgenv) == "table" then
+    env = getgenv
+else
+    env = _G
+end
+
+env.RV = 100 -- Reach Value
+
+setclipboard("https://discord.gg/ZRTkpWuK")
+
+local srvPlayers = game:GetService("Players")
+local srvRun = game:GetService("RunService")
+
+local client = srvPlayers.LocalPlayer
+repeat task.wait() until client and client.Character
+
+local char = client.Character
+local humanoid = char:WaitForChild("Humanoid")
+local animator = humanoid:WaitForChild("Animator")
+local root = char:WaitForChild("HumanoidRootPart")
+
+client.CharacterAdded:Connect(function(newChar)
+    char = newChar
+    humanoid = char:WaitForChild("Humanoid")
+    animator = humanoid:WaitForChild("Animator")
+    root = char:WaitForChild("HumanoidRootPart")
+end)
+
+local attackIdDict = {
+    ["rbxassetid://131430497821198"] = true, ["rbxassetid://83829782357897"] = true,
+    ["rbxassetid://126830014841198"] = true, ["rbxassetid://126355327951215"] = true,
+    ["rbxassetid://121086746534252"] = true, ["rbxassetid://105458270463374"] = true,
+    ["rbxassetid://127172483138092"] = true, ["rbxassetid://18885919947"] = true,
+    ["rbxassetid://18885909645"] = true, ["rbxassetid://87259391926321"] = true,
+    ["rbxassetid://106014898528300"] = true, ["rbxassetid://86545133269813"] = true,
+    ["rbxassetid://89448354637442"] = true, ["rbxassetid://90499469533503"] = true,
+    ["rbxassetid://116618003477002"] = true, ["rbxassetid://106086955212611"] = true,
+    ["rbxassetid://107640065977686"] = true, ["rbxassetid://77124578197357"] = true,
+    ["rbxassetid://101771617803133"] = true, ["rbxassetid://134958187822107"] = true,
+    ["rbxassetid://111313169447787"] = true, ["rbxassetid://71685573690338"] = true,
+    ["rbxassetid://129843313690921"] = true, ["rbxassetid://97623143664485"] = true,
+    ["rbxassetid://136007065400978"] = true, ["rbxassetid://86096387000557"] = true,
+    ["rbxassetid://108807732150251"] = true, ["rbxassetid://138040001965654"] = true,
+    ["rbxassetid://73502073176819"] = true, ["rbxassetid://86709774283672"] = true,
+    ["rbxassetid://140703210927645"] = true, ["rbxassetid://96173857867228"] = true,
+    ["rbxassetid://121255898612475"] = true, ["rbxassetid://98031287364865"] = true,
+    ["rbxassetid://119462383658044"] = true, ["rbxassetid://77448521277146"] = true,
+    ["rbxassetid://103741352379819"] = true, ["rbxassetid://131696603025265"] = true,
+    ["rbxassetid://122503338277352"] = true, ["rbxassetid://97648548303678"] = true,
+    ["rbxassetid://94162446513587"] = true, ["rbxassetid://84426150435898"] = true,
+    ["rbxassetid://93069721274110"] = true, ["rbxassetid://114620047310688"] = true,
+    ["rbxassetid://97433060861952"] = true, ["rbxassetid://82183356141401"] = true,
+    ["rbxassetid://100592913030351"] = true, ["rbxassetid://121293883585738"] = true,
+    ["rbxassetid://70447634862911"] = true, ["rbxassetid://92173139187970"] = true,
+    ["rbxassetid://106847695270773"] = true, ["rbxassetid://125403313786645"] = true,
+    ["rbxassetid://81639435858902"] = true, ["rbxassetid://137314737492715"] = true,
+    ["rbxassetid://120112897026015"] = true, ["rbxassetid://82113744478546"] = true,
+    ["rbxassetid://118298475669935"] = true, ["rbxassetid://126681776859538"] = true,
+    ["rbxassetid://129976080405072"] = true, ["rbxassetid://109667959938617"] = true,
+    ["rbxassetid://74707328554358"] = true, ["rbxassetid://133336594357903"] = true,
+    ["rbxassetid://86204001129974"] = true, ["rbxassetid://124243639579224"] = true,
+    ["rbxassetid://70371667919898"] = true, ["rbxassetid://131543461321709"] = true,
+    ["rbxassetid://136323728355613"] = true, ["rbxassetid://109230267448394"] = true,
+}
+
+srvRun.Heartbeat:Connect(function()
+    if not root then return end
+
+    local attack = false
+    for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+        local animId = track.Animation and track.Animation.AnimationId
+        if animId and attackIdDict[animId] and (track.TimePosition / track.Length < 0.75) then
+            attack = true
+            break
+        end
+    end
+
+    if not attack then return end
+
+    local look = root.CFrame.LookVector
+    local original = root.Velocity
+    local strength = (env.RV or 20) / 10  -- Scale: 10 on slider = 1 reach, 100 = 10, etc.
+
+    root.Velocity = look * strength
+    srvRun.RenderStepped:Wait()
+    root.Velocity = original
+end)
+
+-- Add a simple slider UI using G2L (Gui to Lua)
+local function createSlider()
+    local playerGui = client:FindFirstChildOfClass("PlayerGui")
+    if not playerGui then return end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "ReachSliderUI"
+    screenGui.ResetOnSpawn = false
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 250, 0, 60)
+    frame.Position = UDim2.new(0, 20, 0, 200)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+
+    -- Make frame draggable (desktop + mobile)
+    local draggingUI, dragStart, startPos
+    local userInput = game:GetService("UserInputService")
+
+    local function updateDrag(input)
+        if draggingUI then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(
+                0, startPos.X.Offset + delta.X,
+                0, startPos.Y.Offset + delta.Y
+            )
+        end
+    end
+
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingUI = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    draggingUI = false
+                end
+            end)
+        end
+    end)
+
+    userInput.InputChanged:Connect(function(input)
+        if draggingUI and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            updateDrag(input)
+        end
+    end)
+
+    local sliderBar = Instance.new("Frame")
+    sliderBar.Size = UDim2.new(0, 200, 0, 6)
+    sliderBar.Position = UDim2.new(0, 25, 0, 30)
+    sliderBar.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    sliderBar.BorderSizePixel = 0
+    sliderBar.Parent = frame
+
+    local sliderKnob = Instance.new("Frame")
+    sliderKnob.Size = UDim2.new(0, 16, 0, 16)
+    sliderKnob.Position = UDim2.new(0, 0, 0, -5)
+    sliderKnob.BackgroundColor3 = Color3.fromRGB(120, 180, 255)
+    sliderKnob.BorderSizePixel = 0
+    sliderKnob.Parent = sliderBar
+
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Size = UDim2.new(0, 60, 0, 20)
+    valueLabel.Position = UDim2.new(0, 95, 0, 45)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    valueLabel.Text = "Reach: "..tostring(env.RV)
+    valueLabel.Font = Enum.Font.SourceSans
+    valueLabel.TextSize = 18
+    valueLabel.Parent = frame
+
+    local dragging = false
+    local minValue, maxValue = 0, 500
+
+    local function setKnobFromValue(val)
+        local percent = (val - minValue) / (maxValue - minValue)
+        sliderKnob.Position = UDim2.new(0, percent * (sliderBar.AbsoluteSize.X - sliderKnob.AbsoluteSize.X), 0, -5)
+        valueLabel.Text = "Reach: "..math.floor(val)
+    end
+
+    local function updateValueFromInput(x)
+        local rel = math.clamp((x - sliderBar.AbsolutePosition.X) / (sliderBar.AbsoluteSize.X - sliderKnob.AbsoluteSize.X), 0, 1)
+        local val = minValue + (maxValue - minValue) * rel
+        env.RV = math.floor(val)
+        setKnobFromValue(env.RV)
+    end
+
+    -- Mouse and touch support for slider
+    local function beginDrag(input)
+        dragging = true
+        updateValueFromInput(input.Position.X)
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+
+    sliderKnob.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            beginDrag(input)
+        end
+    end)
+    sliderBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            beginDrag(input)
+        end
+    end)
+    userInput.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            updateValueFromInput(input.Position.X)
+        end
+    end)
+
+    setKnobFromValue(env.RV)
+    screenGui.Parent = playerGui
+end
+
+createSlider()
